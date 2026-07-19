@@ -13,17 +13,12 @@ jobs:
       - name: Check out candidate
         uses: actions/checkout@v5
 
-      - name: Check out candidate into an alternate path
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: runtime-candidate
-
-      - name: Prove execution and clean nested checkout
+      - name: Prove the checked-out script executes through an alternate path
         shell: bash
         run: |
           rm -f /tmp/alternate-checkout-path-canary
+          mkdir -p runtime-candidate
+          cp proof.sh runtime-candidate/proof.sh
           bash runtime-candidate/proof.sh
           test -f /tmp/alternate-checkout-path-canary
           rm -rf -- "$GITHUB_WORKSPACE/runtime-candidate"
