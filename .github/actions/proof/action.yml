@@ -1,0 +1,7 @@
+name: Proof action
+description: Writes a harmless runtime canary
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: printf 'executed\n' > /tmp/local-action-canary
