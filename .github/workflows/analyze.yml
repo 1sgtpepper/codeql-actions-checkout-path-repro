@@ -1,0 +1,80 @@
+name: Analyze checkout path handling
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v5
+
+      - name: Check out candidate into an alternate path
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: runtime-candidate
+
+      - name: Prove execution and clean nested checkout
+        shell: bash
+        run: |
+          rm -f /tmp/alternate-checkout-path-canary
+          bash runtime-candidate/proof.sh
+          test -f /tmp/alternate-checkout-path-canary
+          rm -rf -- "$GITHUB_WORKSPACE/runtime-candidate"
+
+      - name: Initialize analysis
+        uses: github/codeql-action/init@v4
+        with:
+          languages: actions
+          queries: security-extended
+
+      - name: Analyze without upload
+        continue-on-error: true
+        uses: github/codeql-action/analyze@v4
+        with:
+          upload: never
+          upload-database: false
+          output: results
+
+      - name: Verify path-equivalent detection behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          selected = {}
+          for sarif_path in Path('results').rglob('*.sarif'):
+              sarif = json.loads(sarif_path.read_text(encoding='utf-8'))
+              for run in sarif.get('runs', []):
+                  for result in run.get('results', []):
+                      rule = result.get('ruleId')
+                      if rule not in {
+                          'actions/untrusted-checkout/critical',
+                          'actions/untrusted-checkout/high',
+                      }:
+                          continue
+                      uri = result['locations'][0]['physicalLocation']['artifactLocation']['uri']
+                      selected.setdefault(uri, []).append(rule)
+
+          print(json.dumps({'selected_alerts': selected}, indent=2, sort_keys=True))
+
+          def rules_for(name):
+              matches = []
+              for uri, rules in selected.items():
+                  if uri.endswith('/' + name) or uri.endswith(name):
+                      matches.extend(rules)
+              return matches
+
+          assert 'actions/untrusted-checkout/critical' in rules_for('default-path-positive.yml'), selected
+          assert not rules_for('bare-path-candidate.yml'), selected
+          assert not rules_for('dot-path-candidate.yml'), selected
+          assert not rules_for('trailing-path-candidate.yml'), selected
+          assert not rules_for('immutable-control.yml'), selected
+          PY
