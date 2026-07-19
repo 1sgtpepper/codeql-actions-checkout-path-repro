@@ -1,0 +1,66 @@
+name: Verify CodeQL checkout path fix
+
+on:
+  workflow_dispatch:
+    inputs:
+      codeql_repository:
+        description: CodeQL repository containing the candidate fix
+        required: true
+        default: 1sgtpepper/codeql
+      codeql_ref:
+        description: Branch or commit containing the candidate fix
+        required: true
+        default: fix-actions-checkout-path
+      learn:
+        description: Update expected files and upload the resulting patch
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  actions-qltest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate CodeQL source
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ inputs.codeql_repository }}
+          ref: ${{ inputs.codeql_ref }}
+          path: codeql-source
+
+      - name: Install CodeQL
+        uses: ./codeql-source/.github/actions/fetch-codeql
+
+      - name: Run focused Actions query tests
+        shell: bash
+        run: |
+          args=(
+            test run
+            --threads=2
+            --search-path "$GITHUB_WORKSPACE/codeql-source"
+          )
+          if [[ '${{ inputs.learn }}' == 'true' ]]; then
+            args+=(--learn)
+          fi
+          args+=("$GITHUB_WORKSPACE/codeql-source/actions/ql/test/query-tests/Security/CWE-829")
+          codeql "${args[@]}"
+
+      - name: Check and capture learned expectations
+        if: ${{ inputs.learn }}
+        working-directory: codeql-source
+        shell: bash
+        run: |
+          git diff --check
+          git diff --binary -- actions/ql/test/query-tests/Security/CWE-829 > "$RUNNER_TEMP/learned-expectations.patch"
+          test -s "$RUNNER_TEMP/learned-expectations.patch"
+
+      - name: Upload learned expectations
+        if: ${{ inputs.learn }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: learned-expectations
+          path: ${{ runner.temp }}/learned-expectations.patch
+          if-no-files-found: error
