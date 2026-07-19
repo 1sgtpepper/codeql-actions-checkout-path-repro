@@ -55,7 +55,8 @@ jobs:
       - name: Analyze with current CodeQL main queries
         shell: bash
         run: |
-          codeql database analyze "$RUNNER_TEMP/codeql-db/actions" \
+          codeql_bin=$(jq -r .cmd <<<"$CODEQL_ACTION_CLI_VERSION_INFO")
+          "$codeql_bin" database analyze "$RUNNER_TEMP/codeql-db/actions" \
             "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutCritical.ql" \
             "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutHigh.ql" \
             --additional-packs="$RUNNER_TEMP/codeql-main" \
