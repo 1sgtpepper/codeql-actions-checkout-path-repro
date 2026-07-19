@@ -13,6 +13,13 @@ jobs:
       - name: Check out candidate
         uses: actions/checkout@v5
 
+      - name: Prove a checked-out local action executes
+        uses: ./.github/actions/proof
+
+      - name: Verify local action execution
+        shell: bash
+        run: test -f /tmp/local-action-canary
+
       - name: Prove the checked-out script executes through an alternate path
         shell: bash
         run: |
@@ -74,10 +81,12 @@ jobs:
               return matches
 
           assert 'actions/untrusted-checkout/critical' in rules_for('default-path-positive.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
           assert not rules_for('bare-path-candidate.yml'), selected
           assert not rules_for('dot-path-candidate.yml'), selected
           assert not rules_for('trailing-path-candidate.yml'), selected
-          assert not rules_for('quoted-script-candidate.yml'), selected
-          assert not rules_for('workspace-env-script-candidate.yml'), selected
+          assert not rules_for('alternate-action-candidate.yml'), selected
           assert not rules_for('immutable-control.yml'), selected
           PY
