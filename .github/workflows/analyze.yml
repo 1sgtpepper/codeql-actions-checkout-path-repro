@@ -21,6 +21,12 @@ jobs:
           cp proof.sh runtime-candidate/proof.sh
           bash runtime-candidate/proof.sh
           test -f /tmp/alternate-checkout-path-canary
+          rm -f /tmp/alternate-checkout-path-canary
+          bash "./proof.sh"
+          test -f /tmp/alternate-checkout-path-canary
+          rm -f /tmp/alternate-checkout-path-canary
+          bash "$GITHUB_WORKSPACE/proof.sh"
+          test -f /tmp/alternate-checkout-path-canary
           rm -rf -- "$GITHUB_WORKSPACE/runtime-candidate"
 
       - name: Initialize analysis
@@ -71,5 +77,7 @@ jobs:
           assert not rules_for('bare-path-candidate.yml'), selected
           assert not rules_for('dot-path-candidate.yml'), selected
           assert not rules_for('trailing-path-candidate.yml'), selected
+          assert not rules_for('quoted-script-candidate.yml'), selected
+          assert not rules_for('workspace-env-script-candidate.yml'), selected
           assert not rules_for('immutable-control.yml'), selected
           PY
