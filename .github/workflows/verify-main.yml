@@ -1,0 +1,107 @@
+name: Verify current CodeQL main
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out public candidate
+        uses: actions/checkout@v5
+        with:
+          repository: cynecybersec/codeql-actions-checkout-path-repro
+          ref: path-candidates
+
+      - name: Check out candidate into an alternate path
+        uses: actions/checkout@v5
+        with:
+          repository: cynecybersec/codeql-actions-checkout-path-repro
+          ref: path-candidates
+          path: runtime-candidate
+
+      - name: Prove execution and clean nested checkout
+        shell: bash
+        run: |
+          rm -f /tmp/alternate-checkout-path-canary
+          bash runtime-candidate/proof.sh
+          test -f /tmp/alternate-checkout-path-canary
+          rm -rf -- "$GITHUB_WORKSPACE/runtime-candidate"
+
+      - name: Initialize released analysis
+        uses: github/codeql-action/init@v4
+        with:
+          languages: actions
+          queries: security-extended
+          db-location: ${{ runner.temp }}/codeql-db
+
+      - name: Create database with released analysis
+        continue-on-error: true
+        uses: github/codeql-action/analyze@v4
+        with:
+          upload: never
+          upload-database: false
+          output: release-results
+
+      - name: Check out current CodeQL main
+        shell: bash
+        run: |
+          git clone --filter=blob:none --depth=1 https://github.com/github/codeql.git "$RUNNER_TEMP/codeql-main"
+          echo "CODEQL_MAIN_SHA=$(git -C "$RUNNER_TEMP/codeql-main" rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Analyze with current CodeQL main queries
+        shell: bash
+        run: |
+          codeql database analyze "$RUNNER_TEMP/codeql-db/actions" \
+            "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutCritical.ql" \
+            "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutHigh.ql" \
+            --additional-packs="$RUNNER_TEMP/codeql-main" \
+            --format=sarif-latest \
+            --output=main-results.sarif \
+            --rerun
+
+      - name: Verify current main behavior
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          sarif = json.load(open('main-results.sarif', encoding='utf-8'))
+          selected = {}
+          for run in sarif.get('runs', []):
+              for result in run.get('results', []):
+                  rule = result.get('ruleId')
+                  if rule not in {
+                      'actions/untrusted-checkout/critical',
+                      'actions/untrusted-checkout/high',
+                  }:
+                      continue
+                  uri = result['locations'][0]['physicalLocation']['artifactLocation']['uri']
+                  selected.setdefault(uri, []).append(rule)
+
+          print(json.dumps({
+              'codeql_main_sha': os.environ['CODEQL_MAIN_SHA'],
+              'selected_alerts': selected,
+          }, indent=2, sort_keys=True))
+
+          def rules_for(name):
+              matches = []
+              for uri, rules in selected.items():
+                  if uri.endswith('/' + name) or uri.endswith(name):
+                      matches.extend(rules)
+              return matches
+
+          assert 'actions/untrusted-checkout/critical' in rules_for('default-path-positive.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
+          assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
+          assert not rules_for('bare-path-candidate.yml'), selected
+          assert not rules_for('dot-path-candidate.yml'), selected
+          assert not rules_for('trailing-path-candidate.yml'), selected
+          assert not rules_for('alternate-action-candidate.yml'), selected
+          assert not rules_for('immutable-control.yml'), selected
+          PY
