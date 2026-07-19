@@ -2,6 +2,20 @@ name: Verify current CodeQL main
 
 on:
   workflow_dispatch:
+    inputs:
+      codeql_repository:
+        description: CodeQL repository containing the queries to verify
+        required: true
+        default: github/codeql
+      codeql_ref:
+        description: Branch or commit containing the queries to verify
+        required: true
+        default: main
+      expect_fixed:
+        description: Require alternate checkout paths to produce critical alerts
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,25 +60,31 @@ jobs:
           upload-database: false
           output: release-results
 
-      - name: Check out current CodeQL main
+      - name: Check out candidate CodeQL source
+        env:
+          CODEQL_REPOSITORY: ${{ inputs.codeql_repository }}
+          CODEQL_REF: ${{ inputs.codeql_ref }}
         shell: bash
         run: |
-          git clone --filter=blob:none --depth=1 https://github.com/github/codeql.git "$RUNNER_TEMP/codeql-main"
-          echo "CODEQL_MAIN_SHA=$(git -C "$RUNNER_TEMP/codeql-main" rev-parse HEAD)" >> "$GITHUB_ENV"
+          git clone --filter=blob:none --depth=1 --branch "$CODEQL_REF" \
+            "https://github.com/$CODEQL_REPOSITORY.git" "$RUNNER_TEMP/codeql-candidate"
+          echo "CODEQL_CANDIDATE_SHA=$(git -C "$RUNNER_TEMP/codeql-candidate" rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Analyze with current CodeQL main queries
+      - name: Analyze with candidate CodeQL queries
         shell: bash
         run: |
           codeql_bin=$(jq -r .cmd <<<"$CODEQL_ACTION_CLI_VERSION_INFO")
           "$codeql_bin" database analyze "$RUNNER_TEMP/codeql-db/actions" \
-            "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutCritical.ql" \
-            "$RUNNER_TEMP/codeql-main/actions/ql/src/Security/CWE-829/UntrustedCheckoutHigh.ql" \
-            --additional-packs="$RUNNER_TEMP/codeql-main" \
+            "$RUNNER_TEMP/codeql-candidate/actions/ql/src/Security/CWE-829/UntrustedCheckoutCritical.ql" \
+            "$RUNNER_TEMP/codeql-candidate/actions/ql/src/Security/CWE-829/UntrustedCheckoutHigh.ql" \
+            --additional-packs="$RUNNER_TEMP/codeql-candidate" \
             --format=sarif-latest \
             --output=main-results.sarif \
             --rerun
 
-      - name: Verify current main behavior
+      - name: Verify candidate behavior
+        env:
+          EXPECT_FIXED: ${{ inputs.expect_fixed }}
         shell: bash
         run: |
           python - <<'PY'
@@ -85,7 +105,7 @@ jobs:
                   selected.setdefault(uri, []).append(rule)
 
           print(json.dumps({
-              'codeql_main_sha': os.environ['CODEQL_MAIN_SHA'],
+              'codeql_candidate_sha': os.environ['CODEQL_CANDIDATE_SHA'],
               'selected_alerts': selected,
           }, indent=2, sort_keys=True))
 
@@ -100,9 +120,17 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
-          assert not rules_for('bare-path-candidate.yml'), selected
-          assert not rules_for('dot-path-candidate.yml'), selected
-          assert not rules_for('trailing-path-candidate.yml'), selected
-          assert not rules_for('alternate-action-candidate.yml'), selected
+          alternate_paths = {
+              'bare-path-candidate.yml',
+              'dot-path-candidate.yml',
+              'trailing-path-candidate.yml',
+              'alternate-action-candidate.yml',
+          }
+          if os.environ['EXPECT_FIXED'] == 'true':
+              for name in alternate_paths:
+                  assert 'actions/untrusted-checkout/critical' in rules_for(name), (name, selected)
+          else:
+              for name in alternate_paths:
+                  assert not rules_for(name), (name, selected)
           assert not rules_for('immutable-control.yml'), selected
           PY
