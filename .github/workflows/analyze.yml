@@ -7,6 +7,57 @@ permissions:
   contents: read
 
 jobs:
+  runtime-bash:
+    name: runtime (${{ matrix.runner }}, bash)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: bash
+        run: bash "runtime/a/b/proof.sh"
+
+  runtime-sh:
+    name: runtime (${{ matrix.runner }}, sh)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: sh
+        run: sh "runtime/a/b/proof-posix.sh"
+
+  runtime-pwsh:
+    name: runtime (${{ matrix.runner }}, pwsh)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: pwsh
+        run: bash "runtime/a/b/proof.sh"
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -84,9 +135,36 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
+          runner_controls = rules_for('runner-shell-default-controls.yml')
+          assert runner_controls.count('actions/untrusted-checkout/critical') == 4, selected
+          assert runner_controls.count('actions/untrusted-checkout/high') == 3, selected
+          runner_alternates = rules_for('runner-shell-alternate-candidates.yml')
+          assert runner_alternates.count('actions/untrusted-checkout/critical') == 0, selected
+          assert runner_alternates.count('actions/untrusted-checkout/high') == 3, selected
+          assert 'actions/untrusted-checkout/critical' in rules_for(
+              'workflow-run-default-control.yml'
+          ), selected
           assert not rules_for('bare-path-candidate.yml'), selected
           assert not rules_for('dot-path-candidate.yml'), selected
           assert not rules_for('trailing-path-candidate.yml'), selected
           assert not rules_for('alternate-action-candidate.yml'), selected
+          assert not rules_for('nested-quoted-path-candidate.yml'), selected
+          assert not rules_for('workflow-run-alternate-candidate.yml'), selected
           assert not rules_for('immutable-control.yml'), selected
           PY
+
+      - name: Build focused SARIF evidence
+        shell: bash
+        run: |
+          sarif=$(find results -name '*.sarif' -print -quit)
+          test -n "$sarif"
+          python scripts/summarize_sarif.py "$sarif" ci-evidence
+
+      - name: Upload SARIF and alert-list evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-path-evidence-release
+          path: |
+            results/**/*.sarif
+            ci-evidence/*
+          if-no-files-found: error

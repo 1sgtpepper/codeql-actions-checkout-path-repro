@@ -1,0 +1,57 @@
+{
+  "issue": "https://github.com/github/codeql/issues/22213",
+  "current_behavior": {
+    "critical_controls": [
+      "default-path-positive.yml",
+      "default-action-positive.yml",
+      "quoted-script-candidate.yml",
+      "workspace-env-script-candidate.yml",
+      "runner-shell-default-controls.yml",
+      "workflow-run-default-control.yml"
+    ],
+    "expected_critical_but_missing": [
+      "bare-path-candidate.yml",
+      "dot-path-candidate.yml",
+      "trailing-path-candidate.yml",
+      "alternate-action-candidate.yml",
+      "nested-quoted-path-candidate.yml",
+      "runner-shell-alternate-candidates.yml (bash and sh jobs)",
+      "workflow-run-alternate-candidate.yml"
+    ],
+    "negative_controls": [
+      "immutable-control.yml"
+    ]
+  },
+  "runner_shell_pairs": [
+    ["ubuntu-latest", "bash"],
+    ["ubuntu-latest", "sh"],
+    ["ubuntu-latest", "pwsh"],
+    ["windows-latest", "pwsh"],
+    ["macos-latest", "bash"],
+    ["macos-latest", "sh"],
+    ["macos-latest", "pwsh"]
+  ],
+  "runner_shell_observed_alert_counts": {
+    "default_path": {
+      "critical": 4,
+      "high": 3
+    },
+    "alternate_path": {
+      "critical": 0,
+      "high": 3
+    },
+    "interpretation": "bash and sh reproduce the alternate-path total suppression on Ubuntu and macOS; pwsh produces high rather than critical for both path forms; Windows, Ubuntu, and macOS agree within each tested shell family"
+  },
+  "path_forms": [
+    "candidate",
+    "./candidate",
+    "candidate/",
+    "a/b",
+    "quoted local script path",
+    "local action path"
+  ],
+  "privileged_triggers": [
+    "pull_request_target",
+    "workflow_run"
+  ]
+}
