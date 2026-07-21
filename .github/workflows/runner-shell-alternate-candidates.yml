@@ -22,7 +22,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           path: candidate
       - shell: sh
-        run: sh candidate/proof.sh
+        run: sh candidate/proof-posix.sh
   ubuntu-pwsh:
     runs-on: ubuntu-latest
     steps:
@@ -62,7 +62,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           path: candidate
       - shell: sh
-        run: sh candidate/proof.sh
+        run: sh candidate/proof-posix.sh
   macos-pwsh:
     runs-on: macos-latest
     steps:

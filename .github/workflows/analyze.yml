@@ -39,7 +39,7 @@ jobs:
 
       - name: Execute the nested, quoted script path
         shell: sh
-        run: sh "runtime/a/b/proof.sh"
+        run: sh "runtime/a/b/proof-posix.sh"
 
   runtime-pwsh:
     name: runtime (${{ matrix.runner }}, pwsh)
