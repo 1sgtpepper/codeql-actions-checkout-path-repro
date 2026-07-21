@@ -128,9 +128,9 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
-          assert rules_for('runner-shell-default-controls.yml').count(
-              'actions/untrusted-checkout/critical'
-          ) == 7, selected
+          runner_controls = rules_for('runner-shell-default-controls.yml')
+          assert runner_controls.count('actions/untrusted-checkout/critical') == 4, selected
+          assert runner_controls.count('actions/untrusted-checkout/high') == 3, selected
           assert 'actions/untrusted-checkout/critical' in rules_for(
               'workflow-run-default-control.yml'
           ), selected
@@ -140,15 +140,20 @@ jobs:
               'trailing-path-candidate.yml',
               'alternate-action-candidate.yml',
               'nested-quoted-path-candidate.yml',
-              'runner-shell-alternate-candidates.yml',
               'workflow-run-alternate-candidate.yml',
           }
           if os.environ['EXPECT_FIXED'] == 'true':
               for name in alternate_paths:
                   assert 'actions/untrusted-checkout/critical' in rules_for(name), (name, selected)
+              runner_alternates = rules_for('runner-shell-alternate-candidates.yml')
+              assert runner_alternates.count('actions/untrusted-checkout/critical') == 4, selected
+              assert runner_alternates.count('actions/untrusted-checkout/high') == 3, selected
           else:
               for name in alternate_paths:
                   assert not rules_for(name), (name, selected)
+              runner_alternates = rules_for('runner-shell-alternate-candidates.yml')
+              assert runner_alternates.count('actions/untrusted-checkout/critical') == 0, selected
+              assert runner_alternates.count('actions/untrusted-checkout/high') == 3, selected
           assert not rules_for('immutable-control.yml'), selected
           PY
 

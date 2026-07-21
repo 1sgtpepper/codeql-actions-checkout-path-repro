@@ -7,6 +7,9 @@ The workflow fixtures compare default and alternate `actions/checkout` paths
 across Linux, Windows, macOS, `bash`, `sh`, `pwsh`, nested and quoted paths,
 local actions, and `workflow_run`. CI executes the runtime-compatible matrix,
 analyzes the workflow files, and uploads focused SARIF and JSON alert evidence.
+The expected matrix records the observed shell distinction: `bash` and `sh`
+reproduce total alternate-path suppression, while `pwsh` receives the `high`
+fallback for both default and alternate paths.
 
 [`evidence/expected-matrix.json`](evidence/expected-matrix.json) records the
 expected behavior on an affected CodeQL release. `scripts/summarize_sarif.py`

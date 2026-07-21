@@ -135,9 +135,12 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
-          assert rules_for('runner-shell-default-controls.yml').count(
-              'actions/untrusted-checkout/critical'
-          ) == 7, selected
+          runner_controls = rules_for('runner-shell-default-controls.yml')
+          assert runner_controls.count('actions/untrusted-checkout/critical') == 4, selected
+          assert runner_controls.count('actions/untrusted-checkout/high') == 3, selected
+          runner_alternates = rules_for('runner-shell-alternate-candidates.yml')
+          assert runner_alternates.count('actions/untrusted-checkout/critical') == 0, selected
+          assert runner_alternates.count('actions/untrusted-checkout/high') == 3, selected
           assert 'actions/untrusted-checkout/critical' in rules_for(
               'workflow-run-default-control.yml'
           ), selected
@@ -146,7 +149,6 @@ jobs:
           assert not rules_for('trailing-path-candidate.yml'), selected
           assert not rules_for('alternate-action-candidate.yml'), selected
           assert not rules_for('nested-quoted-path-candidate.yml'), selected
-          assert not rules_for('runner-shell-alternate-candidates.yml'), selected
           assert not rules_for('workflow-run-alternate-candidate.yml'), selected
           assert not rules_for('immutable-control.yml'), selected
           PY

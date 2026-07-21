@@ -15,7 +15,7 @@
       "trailing-path-candidate.yml",
       "alternate-action-candidate.yml",
       "nested-quoted-path-candidate.yml",
-      "runner-shell-alternate-candidates.yml",
+      "runner-shell-alternate-candidates.yml (bash and sh jobs)",
       "workflow-run-alternate-candidate.yml"
     ],
     "negative_controls": [
@@ -31,6 +31,17 @@
     ["macos-latest", "sh"],
     ["macos-latest", "pwsh"]
   ],
+  "runner_shell_observed_alert_counts": {
+    "default_path": {
+      "critical": 4,
+      "high": 3
+    },
+    "alternate_path": {
+      "critical": 0,
+      "high": 3
+    },
+    "interpretation": "bash and sh reproduce the alternate-path total suppression on Ubuntu and macOS; pwsh produces high rather than critical for both path forms; Windows, Ubuntu, and macOS agree within each tested shell family"
+  },
   "path_forms": [
     "candidate",
     "./candidate",
