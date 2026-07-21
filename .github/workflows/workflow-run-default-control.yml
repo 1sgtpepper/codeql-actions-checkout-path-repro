@@ -1,0 +1,16 @@
+name: Workflow run default path control
+on:
+  workflow_run:
+    workflows: [Untrusted producer]
+    types: [completed]
+permissions:
+  contents: write
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - run: bash proof.sh

@@ -1,0 +1,46 @@
+{
+  "issue": "https://github.com/github/codeql/issues/22213",
+  "current_behavior": {
+    "critical_controls": [
+      "default-path-positive.yml",
+      "default-action-positive.yml",
+      "quoted-script-candidate.yml",
+      "workspace-env-script-candidate.yml",
+      "runner-shell-default-controls.yml",
+      "workflow-run-default-control.yml"
+    ],
+    "expected_critical_but_missing": [
+      "bare-path-candidate.yml",
+      "dot-path-candidate.yml",
+      "trailing-path-candidate.yml",
+      "alternate-action-candidate.yml",
+      "nested-quoted-path-candidate.yml",
+      "runner-shell-alternate-candidates.yml",
+      "workflow-run-alternate-candidate.yml"
+    ],
+    "negative_controls": [
+      "immutable-control.yml"
+    ]
+  },
+  "runner_shell_pairs": [
+    ["ubuntu-latest", "bash"],
+    ["ubuntu-latest", "sh"],
+    ["ubuntu-latest", "pwsh"],
+    ["windows-latest", "pwsh"],
+    ["macos-latest", "bash"],
+    ["macos-latest", "sh"],
+    ["macos-latest", "pwsh"]
+  ],
+  "path_forms": [
+    "candidate",
+    "./candidate",
+    "candidate/",
+    "a/b",
+    "quoted local script path",
+    "local action path"
+  ],
+  "privileged_triggers": [
+    "pull_request_target",
+    "workflow_run"
+  ]
+}

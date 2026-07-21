@@ -3,6 +3,14 @@ name: Verify current CodeQL main
 on:
   workflow_dispatch:
     inputs:
+      repro_repository:
+        description: Repository containing the workflow fixtures
+        required: true
+        default: 1sgtpepper/codeql-actions-checkout-path-repro
+      repro_ref:
+        description: Branch or commit containing the workflow fixtures
+        required: true
+        default: codeql-22213-expanded-matrix
       codeql_repository:
         description: CodeQL repository containing the queries to verify
         required: true
@@ -27,14 +35,14 @@ jobs:
       - name: Check out public candidate
         uses: actions/checkout@v5
         with:
-          repository: cynecybersec/codeql-actions-checkout-path-repro
-          ref: path-candidates
+          repository: ${{ inputs.repro_repository }}
+          ref: ${{ inputs.repro_ref }}
 
       - name: Check out candidate into an alternate path
         uses: actions/checkout@v5
         with:
-          repository: cynecybersec/codeql-actions-checkout-path-repro
-          ref: path-candidates
+          repository: ${{ inputs.repro_repository }}
+          ref: ${{ inputs.repro_ref }}
           path: runtime-candidate
 
       - name: Prove execution and clean nested checkout
@@ -120,11 +128,20 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
+          assert rules_for('runner-shell-default-controls.yml').count(
+              'actions/untrusted-checkout/critical'
+          ) == 7, selected
+          assert 'actions/untrusted-checkout/critical' in rules_for(
+              'workflow-run-default-control.yml'
+          ), selected
           alternate_paths = {
               'bare-path-candidate.yml',
               'dot-path-candidate.yml',
               'trailing-path-candidate.yml',
               'alternate-action-candidate.yml',
+              'nested-quoted-path-candidate.yml',
+              'runner-shell-alternate-candidates.yml',
+              'workflow-run-alternate-candidate.yml',
           }
           if os.environ['EXPECT_FIXED'] == 'true':
               for name in alternate_paths:
@@ -134,3 +151,16 @@ jobs:
                   assert not rules_for(name), (name, selected)
           assert not rules_for('immutable-control.yml'), selected
           PY
+
+      - name: Build focused SARIF evidence
+        shell: bash
+        run: python scripts/summarize_sarif.py main-results.sarif ci-evidence
+
+      - name: Upload current-main SARIF and alert-list evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-path-evidence-current-main
+          path: |
+            main-results.sarif
+            ci-evidence/*
+          if-no-files-found: error

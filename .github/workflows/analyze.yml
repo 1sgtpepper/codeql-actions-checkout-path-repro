@@ -7,6 +7,44 @@ permissions:
   contents: read
 
 jobs:
+  runtime-matrix:
+    name: runtime (${{ matrix.runner }}, ${{ matrix.shell }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            shell: bash
+            command: bash
+          - runner: ubuntu-latest
+            shell: sh
+            command: sh
+          - runner: ubuntu-latest
+            shell: pwsh
+            command: bash
+          - runner: windows-latest
+            shell: pwsh
+            command: bash
+          - runner: macos-latest
+            shell: bash
+            command: bash
+          - runner: macos-latest
+            shell: sh
+            command: sh
+          - runner: macos-latest
+            shell: pwsh
+            command: bash
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.command }} "runtime/a/b/proof.sh"
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -84,9 +122,34 @@ jobs:
           assert 'actions/untrusted-checkout/critical' in rules_for('default-action-positive.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('quoted-script-candidate.yml'), selected
           assert 'actions/untrusted-checkout/critical' in rules_for('workspace-env-script-candidate.yml'), selected
+          assert rules_for('runner-shell-default-controls.yml').count(
+              'actions/untrusted-checkout/critical'
+          ) == 7, selected
+          assert 'actions/untrusted-checkout/critical' in rules_for(
+              'workflow-run-default-control.yml'
+          ), selected
           assert not rules_for('bare-path-candidate.yml'), selected
           assert not rules_for('dot-path-candidate.yml'), selected
           assert not rules_for('trailing-path-candidate.yml'), selected
           assert not rules_for('alternate-action-candidate.yml'), selected
+          assert not rules_for('nested-quoted-path-candidate.yml'), selected
+          assert not rules_for('runner-shell-alternate-candidates.yml'), selected
+          assert not rules_for('workflow-run-alternate-candidate.yml'), selected
           assert not rules_for('immutable-control.yml'), selected
           PY
+
+      - name: Build focused SARIF evidence
+        shell: bash
+        run: |
+          sarif=$(find results -name '*.sarif' -print -quit)
+          test -n "$sarif"
+          python scripts/summarize_sarif.py "$sarif" ci-evidence
+
+      - name: Upload SARIF and alert-list evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-path-evidence-release
+          path: |
+            results/**/*.sarif
+            ci-evidence/*
+          if-no-files-found: error
