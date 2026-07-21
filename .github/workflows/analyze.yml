@@ -7,33 +7,12 @@ permissions:
   contents: read
 
 jobs:
-  runtime-matrix:
-    name: runtime (${{ matrix.runner }}, ${{ matrix.shell }})
+  runtime-bash:
+    name: runtime (${{ matrix.runner }}, bash)
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: ubuntu-latest
-            shell: bash
-            command: bash
-          - runner: ubuntu-latest
-            shell: sh
-            command: sh
-          - runner: ubuntu-latest
-            shell: pwsh
-            command: bash
-          - runner: windows-latest
-            shell: pwsh
-            command: bash
-          - runner: macos-latest
-            shell: bash
-            command: bash
-          - runner: macos-latest
-            shell: sh
-            command: sh
-          - runner: macos-latest
-            shell: pwsh
-            command: bash
+        runner: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out into a nested path
@@ -42,8 +21,42 @@ jobs:
           path: runtime/a/b
 
       - name: Execute the nested, quoted script path
-        shell: ${{ matrix.shell }}
-        run: ${{ matrix.command }} "runtime/a/b/proof.sh"
+        shell: bash
+        run: bash "runtime/a/b/proof.sh"
+
+  runtime-sh:
+    name: runtime (${{ matrix.runner }}, sh)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: sh
+        run: sh "runtime/a/b/proof.sh"
+
+  runtime-pwsh:
+    name: runtime (${{ matrix.runner }}, pwsh)
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out into a nested path
+        uses: actions/checkout@v5
+        with:
+          path: runtime/a/b
+
+      - name: Execute the nested, quoted script path
+        shell: pwsh
+        run: bash "runtime/a/b/proof.sh"
 
   verify:
     runs-on: ubuntu-latest
